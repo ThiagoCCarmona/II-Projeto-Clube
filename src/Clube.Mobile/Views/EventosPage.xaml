@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:views="clr-namespace:Clube.Mobile.Views"
+             x:Class="Clube.Mobile.Views.EventosPage"
+             Title="Eventos">
+    <Grid RowDefinitions="Auto,Auto,*" Padding="14" RowSpacing="8">
+        <views:NetworkStatusBar Grid.Row="0" />
+
+        <VerticalStackLayout Grid.Row="1" Spacing="6">
+            <Label Text="{Binding MensagemStatus}" FontSize="12" TextColor="#0369A1" FontAttributes="Bold" />
+            <HorizontalStackLayout Spacing="8" VerticalOptions="Center">
+                <Label Text="Acompanhantes no RSVP:" VerticalOptions="Center" FontSize="13" />
+                <Entry Text="{Binding QuantidadeAcompanhantes}" Keyboard="Numeric" WidthRequest="60" />
+            </HorizontalStackLayout>
+        </VerticalStackLayout>
+
+        <CollectionView Grid.Row="2" ItemsSource="{Binding Eventos}">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Border Margin="0,0,0,10" Padding="12" Stroke="#CBD5E1" BackgroundColor="White">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="8" />
+                        </Border.StrokeShape>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="{Binding Titulo}" FontAttributes="Bold" FontSize="16" />
+                            <Label Text="{Binding Descricao}" FontSize="12" TextColor="#475569" />
+                            <Label Text="{Binding PublicoAlvo, StringFormat='Publico: {0}'}" FontSize="12" TextColor="#1D4ED8" />
+                            <Label Text="{Binding Local, StringFormat='Local: {0}'}" FontSize="12" />
+                            <Label Text="{Binding DataInicio, StringFormat='Inicio: {0:dd/MM/yyyy HH:mm}'}" FontSize="12" />
+                            <Label Text="{Binding ValorIngresso, StringFormat='Ingresso: R$ {0:N2}'}" FontSize="12" FontAttributes="Bold" />
+                            <Button Text="Confirmar Presenca (RSVP)"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ConfirmarPresencaCommand}"
+                                    CommandParameter="{Binding .}"
+                                    BackgroundColor="#1D4ED8"
+                                    TextColor="White"
+                                    Margin="0,6,0,0" />
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

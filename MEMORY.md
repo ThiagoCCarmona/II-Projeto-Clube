@@ -48,8 +48,20 @@ Este arquivo registra decisões de ambiente, bugs históricos já diagnosticados
   ```
 
 ### ❌ Erro 5: `dotnet test` na raiz com múltiplos arquivos de solução
-- **Causa:** Se houver `.sln` e `.slnx` na raiz, `dotnet test` sem argumento falha com `MSB1011`.
-- **Prevenção:** Manter apenas `ProjetoClube.sln` (ou sempre executar `dotnet test ProjetoClube.sln`).
+- **Causa:** No .NET 10, `dotnet new sln` gera `.slnx` por padrão; se houver `.sln` e `.slnx` na raiz, `dotnet test` sem argumento falha com `MSB1011`.
+- **Prevenção:** Criar sempre com `dotnet new sln -n ProjetoClube --format sln` mantendo apenas `ProjetoClube.sln` (e sempre executar `dotnet test ProjetoClube.sln`).
+
+### ❌ Erro 6: Pacotes NuGet `11.0.0` incompatíveis ao adicionar sem versão em projetos `net10.0`
+- **Sintoma:** `NU1202: O pacote ... 11.0.0 não é compatível com net10.0`.
+- **Prevenção:** Ao instalar pacotes `Microsoft.EntityFrameworkCore.Sqlite`, `Microsoft.AspNetCore.Authentication.JwtBearer` ou `Microsoft.AspNetCore.Mvc.Testing` em projetos `.NET 10`, fixar a versão compatível (ex.: `-v 10.0.11`).
+
+### ❌ Erro 7: Testes de integração (`WebApplicationFactory`) tocando o banco `app_clubes.db` da raiz
+- **Causa:** `builder.Configuration.GetConnectionString("DefaultConnection")` avaliado nos *top-level statements* do `Program.cs` executa antes do callback `ConfigureAppConfiguration` da `WebApplicationFactory`.
+- **Prevenção:** No `CustomApiFactory`, remover as registrações `DbContextOptions<ClubeDbContext>` / `IDbContextOptionsConfiguration<ClubeDbContext>` em `ConfigureServices` e registrar `UseSqlite` apontando para arquivo temporário isolado em `Path.GetTempPath()`.
+
+### ❌ Erro 8: Erro Android `APT2265` quando o workspace contém caracteres acentuados no caminho
+- **Sintoma:** `error APT2265` no target `net10.0-android` quando a pasta do repositório possui acentos (`Ciencia da Computação - UDC\Programação Web Mobile`).
+- **Prevenção:** Em `src/Clube.Mobile/Clube.Mobile.csproj`, manter `net10.0-windows10.0.19041.0` como target padrão no Windows e habilitar `net10.0-android` condicionalmente (`-p:EnableAndroidBuild=true` quando o projeto estiver em diretório apenas ASCII, além de `android:usesCleartextTraffic="true"` no `AndroidManifest.xml` para permitir `http://10.0.2.2:5000`).
 
 ---
 

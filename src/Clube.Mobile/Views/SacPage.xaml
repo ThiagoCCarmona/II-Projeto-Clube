@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:views="clr-namespace:Clube.Mobile.Views"
+             x:Class="Clube.Mobile.Views.SacPage"
+             Title="SAC">
+    <ScrollView>
+        <VerticalStackLayout Padding="14" Spacing="10">
+            <views:NetworkStatusBar />
+
+            <Label Text="{Binding MensagemStatus}" FontSize="12" TextColor="#0369A1" FontAttributes="Bold" />
+
+            <Border Padding="12" Stroke="#CBD5E1" BackgroundColor="White">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="8" />
+                </Border.StrokeShape>
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Nova Solicitacao ou Reclamacao" FontAttributes="Bold" FontSize="15" />
+                    <Picker ItemsSource="{Binding Tipos}" SelectedItem="{Binding TipoSelecionado}" />
+                    <Entry Text="{Binding Assunto}" Placeholder="Assunto" />
+                    <Editor Text="{Binding Descricao}" Placeholder="Descreva sua solicitacao ou reclamacao..." HeightRequest="80" />
+                    <Button Text="Enviar Registro (Online ou Outbox)"
+                            Command="{Binding EnviarCommand}"
+                            BackgroundColor="#1D4ED8"
+                            TextColor="White"
+                            FontAttributes="Bold" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Label Text="Meus Registros" FontAttributes="Bold" FontSize="15" Margin="0,6,0,0" />
+            <CollectionView ItemsSource="{Binding Solicitacoes}">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="0,0,0,8" Padding="10" Stroke="#E2E8F0" BackgroundColor="White">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="8" />
+                            </Border.StrokeShape>
+                            <VerticalStackLayout Spacing="3">
+                                <Label Text="{Binding Assunto}" FontAttributes="Bold" FontSize="14" />
+                                <Label Text="{Binding Tipo, StringFormat='Tipo: {0}'}" FontSize="11" TextColor="#1D4ED8" />
+                                <Label Text="{Binding Descricao}" FontSize="12" />
+                                <Label Text="{Binding Status, StringFormat='Status: {0}'}" FontSize="12" FontAttributes="Bold" />
+                                <Label Text="{Binding RespostaDiretoria, StringFormat='Resposta Diretoria: {0}'}" FontSize="12" TextColor="#15803D" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:views="clr-namespace:Clube.Mobile.Views"
+             x:Class="Clube.Mobile.Views.ReservasPage"
+             Title="Reservas">
+    <ScrollView>
+        <VerticalStackLayout Padding="14" Spacing="10">
+            <views:NetworkStatusBar />
+
+            <Label Text="{Binding MensagemStatus}" FontSize="12" TextColor="#0369A1" FontAttributes="Bold" />
+
+            <Border Padding="12" Stroke="#CBD5E1" BackgroundColor="White">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="8" />
+                </Border.StrokeShape>
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Solicitar Reserva Continua (Salao / Espaco)" FontAttributes="Bold" FontSize="15" />
+
+                    <Label Text="Espaco" FontSize="12" />
+                    <Picker ItemsSource="{Binding Espacos}" ItemDisplayBinding="{Binding Nome}" SelectedItem="{Binding EspacoSelecionado}" />
+
+                    <Label Text="Finalidade" FontSize="12" />
+                    <Picker ItemsSource="{Binding Finalidades}" SelectedItem="{Binding FinalidadeSelecionada}" />
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Data Inicio" FontSize="12" />
+                            <DatePicker Date="{Binding DataInicio}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1">
+                            <Label Text="Hora Inicio" FontSize="12" />
+                            <TimePicker Time="{Binding HoraInicio}" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <VerticalStackLayout Grid.Column="0">
+                            <Label Text="Data Fim" FontSize="12" />
+                            <DatePicker Date="{Binding DataFim}" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1">
+                            <Label Text="Hora Fim" FontSize="12" />
+                            <TimePicker Time="{Binding HoraFim}" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <Entry Text="{Binding Observacoes}" Placeholder="Observacoes (ex.: Feijoada 2 dias)" />
+
+                    <Button Text="Enviar Reserva (Online ou Outbox)"
+                            Command="{Binding SolicitarReservaCommand}"
+                            BackgroundColor="#1D4ED8"
+                            TextColor="White"
+                            FontAttributes="Bold" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Label Text="Reservas do Clube" FontAttributes="Bold" FontSize="15" Margin="0,6,0,0" />
+            <CollectionView ItemsSource="{Binding Reservas}">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="0,0,0,8" Padding="10" Stroke="#E2E8F0" BackgroundColor="White">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="8" />
+                            </Border.StrokeShape>
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="{Binding EspacoNome}" FontAttributes="Bold" FontSize="14" />
+                                <Label Text="{Binding FinalidadeUso, StringFormat='Finalidade: {0}'}" FontSize="12" />
+                                <Label Text="{Binding DataHoraInicio, StringFormat='Inicio: {0:dd/MM/yyyy HH:mm}'}" FontSize="12" />
+                                <Label Text="{Binding DataHoraFim, StringFormat='Fim: {0:dd/MM/yyyy HH:mm}'}" FontSize="12" />
+                                <Label Text="{Binding Status, StringFormat='Status: {0}'}" FontAttributes="Bold" TextColor="#0F766E" FontSize="12" />
+                                <Label Text="{Binding Observacoes}" FontSize="11" TextColor="#64748B" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
