@@ -1,0 +1,154 @@
+﻿@page "/"
+@inject AdminSessionState Session
+@inject IClubeService ClubeService
+@inject IAssociadoService AssociadoService
+@inject IReservaService ReservaService
+@inject IMensalidadeService MensalidadeService
+@inject ISolicitacaoService SolicitacaoService
+@inject IEventoService EventoService
+@implements IDisposable
+
+<PageTitle>Dashboard — Projeto Clubes</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">Painel de Governanca — @Session.ClubeNome</h2>
+        <small class="text-muted">Perfil ativo: <strong>@Session.Perfil</strong> (@Session.NomeUsuario)</small>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    @if (Session.EhSuperAdmin)
+    {
+        <div class="col-md-3">
+            <div class="p-3 clube-kpi-card">
+                <div class="text-muted small">Clubes da Federacao</div>
+                <div class="fs-2 fw-bold text-primary">@_clubesCount</div>
+            </div>
+        </div>
+    }
+    <div class="col-md-3">
+        <div class="p-3 clube-kpi-card">
+            <div class="text-muted small">Associados (Pendentes: @_pendentesAprovacao)</div>
+            <div class="fs-2 fw-bold text-dark">@_associadosCount</div>
+            <small class="text-success">Com direito a voto: @_comDireitoAVoto</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="p-3 clube-kpi-card">
+            <div class="text-muted small">Reservas (Conflitos/Pend.: @_reservasConflito)</div>
+            <div class="fs-2 fw-bold text-warning">@_reservasCount</div>
+            <small class="text-muted">Eventos ativos: @_eventosCount</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="p-3 clube-kpi-card">
+            <div class="text-muted small">Mensalidades Pendentes</div>
+            <div class="fs-2 fw-bold text-danger">@_mensalidadesPendentes</div>
+            <small class="text-muted">SAC abertos: @_sacAbertos</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-semibold">Resumo de Acoes Recomendadas</div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    @if (_pendentesAprovacao > 0 && Session.PodeGerenciarAssociadosEReservas)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Cadastros de associados aguardando aprovacao</span>
+                            <a href="associados" class="btn btn-sm btn-warning">Analisar (@_pendentesAprovacao)</a>
+                        </li>
+                    }
+                    @if (_reservasConflito > 0 && Session.PodeGerenciarAssociadosEReservas)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Reservas de espacos pendentes ou em conflito</span>
+                            <a href="reservas" class="btn btn-sm btn-danger">Mediar (@_reservasConflito)</a>
+                        </li>
+                    }
+                    @if (_mensalidadesPendentes > 0 && Session.PodeGerenciarFinanceiro)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Cobrancas PIX pendentes de baixa</span>
+                            <a href="financeiro" class="btn btn-sm btn-success">Financeiro (@_mensalidadesPendentes)</a>
+                        </li>
+                    }
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>Solicitacoes e reclamacoes no SAC</span>
+                        <a href="solicitacoes" class="btn btn-sm btn-outline-primary">Abrir SAC (@_sacAbertos abertas)</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-semibold">Guia Rapido de Demonstracao Academica</div>
+            <div class="card-body small">
+                <p class="mb-2">Use os botoes no topo da tela para alternar entre os perfis sem precisar digitar senha:</p>
+                <ul class="mb-0">
+                    <li><strong>SuperAdmin:</strong> visualiza e gerencia todos os clubes da federacao sem filtro de tenant.</li>
+                    <li><strong>Pres. Foz (Carlos Kaneko):</strong> aprova socios, media conflitos de reservas e cria eventos apenas de Foz.</li>
+                    <li><strong>Tesoureiro Foz:</strong> gera mensalidades em lote com PIX Copia-e-Cola EMV CRC16 e faz baixas manuais.</li>
+                    <li><strong>Pres. Guaira:</strong> demonstra o isolamento multi-tenant restrito ao Iate Clube Guaira.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int _clubesCount;
+    private int _associadosCount;
+    private int _pendentesAprovacao;
+    private int _comDireitoAVoto;
+    private int _reservasCount;
+    private int _reservasConflito;
+    private int _eventosCount;
+    private int _mensalidadesPendentes;
+    private int _sacAbertos;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Session.OnSessionChanged += HandleSessionChanged;
+        await LoadAsync();
+    }
+
+    private async void HandleSessionChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadAsync()
+    {
+        Session.AplicarNoEscopo();
+        var clubes = await ClubeService.ListarAsync();
+        var associados = await AssociadoService.ListarAsync();
+        var reservas = await ReservaService.ListarReservasAsync();
+        var eventos = await EventoService.ListarAsync();
+        var mensalidades = await MensalidadeService.ListarAsync();
+        var solicitacoes = await SolicitacaoService.ListarAsync();
+
+        _clubesCount = clubes.Count;
+        _associadosCount = associados.Count;
+        _pendentesAprovacao = associados.Count(a => a.StatusAprovacao == StatusAprovacao.Pendente);
+        _comDireitoAVoto = associados.Count(a => a.TemDireitoAVoto);
+        _reservasCount = reservas.Count;
+        _reservasConflito = reservas.Count(r =>
+            r.Status is StatusReserva.PendenteAprovacao or StatusReserva.Conflito || r.TemConflitoPendente);
+        _eventosCount = eventos.Count;
+        _mensalidadesPendentes = mensalidades.Count(m => m.Status == StatusMensalidade.Pendente);
+        _sacAbertos = solicitacoes.Count(s => s.Status != StatusSolicitacao.Respondida);
+    }
+
+    public void Dispose() => Session.OnSessionChanged -= HandleSessionChanged;
+}

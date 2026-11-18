@@ -1,0 +1,284 @@
+@page "/reservas"
+@inject AdminSessionState Session
+@inject IReservaService ReservaService
+@inject IAssociadoService AssociadoService
+@implements IDisposable
+
+<PageTitle>Salao Social &amp; Reservas Continuas</PageTitle>
+
+<h3>Salao Social, Espacos &amp; Mediacao de Conflitos</h3>
+<p class="text-muted small">
+    Reservas aceitam intervalo continuo (inclusive cruzando multiplos dias, ex.: Feijoada de 31/10 a 01/11).
+    Conflitos entre reservas pendentes sao destacados para mediacao do Presidente.
+</p>
+
+@if (!string.IsNullOrEmpty(_feedback))
+{
+    <div class="alert @(_erro ? "alert-danger" : "alert-success") alert-dismissible fade show">
+        @_feedback
+        <button type="button" class="btn-close" @onclick="() => _feedback = null"></button>
+    </div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-semibold">Espacos Cadastrados (@_espacos.Count)</div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush mb-3">
+                    @foreach (var e in _espacos)
+                    {
+                        <li class="list-group-item px-0 d-flex justify-content-between">
+                            <div>
+                                <div class="fw-semibold">@e.Nome</div>
+                                <small class="text-muted">@e.Descricao</small>
+                            </div>
+                            <span class="badge bg-light text-dark border align-self-center">
+                                @e.Capacidade lug. | R$ @e.TaxaReserva.ToString("N2")
+                            </span>
+                        </li>
+                    }
+                </ul>
+                <div class="border-top pt-2">
+                    <div class="small fw-semibold mb-1">Adicionar Novo Espaco</div>
+                    <div class="row g-1">
+                        <div class="col-6">
+                            <input class="form-control form-control-sm" @bind="_novoEspacoNome" placeholder="Nome (ex: Salao VIP)" />
+                        </div>
+                        <div class="col-3">
+                            <input type="number" class="form-control form-control-sm" @bind="_novoEspacoCap" placeholder="Cap." />
+                        </div>
+                        <div class="col-3">
+                            <button class="btn btn-sm btn-outline-primary w-100" @onclick="CriarEspacoAsync">+ Espaco</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-semibold">Nova Reserva Continua (Multi-Dia)</div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label small">Espaco</label>
+                        <select class="form-select form-select-sm" @bind="_espacoId">
+                            @foreach (var e in _espacos)
+                            {
+                                <option value="@e.Id">@e.Nome</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">Associado Solicitante</label>
+                        <select class="form-select form-select-sm" @bind="_associadoId">
+                            @foreach (var a in _associados)
+                            {
+                                <option value="@a.Id">@a.Nome (@a.TipoAssociado)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Finalidade</label>
+                        <select class="form-select form-select-sm" @bind="_finalidade">
+                            @foreach (var f in Enum.GetValues<FinalidadeUsoEspaco>())
+                            {
+                                <option value="@f">@f</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Data/Hora Inicio</label>
+                        <input type="datetime-local" class="form-control form-control-sm" @bind="_inicio" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Data/Hora Fim</label>
+                        <input type="datetime-local" class="form-control form-control-sm" @bind="_fim" />
+                    </div>
+                    <div class="col-md-9">
+                        <label class="form-label small">Observacoes</label>
+                        <input class="form-control form-control-sm" @bind="_observacoes" placeholder="Ex: Feijoada Beneficente" />
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button class="btn btn-sm btn-primary w-100" @onclick="SolicitarReservaAsync">Solicitar Reserva</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-bordered align-middle bg-white">
+        <thead class="table-light">
+            <tr>
+                <th>Espaco</th>
+                <th>Associado</th>
+                <th>Finalidade</th>
+                <th>Periodo Continuo</th>
+                <th>Status / Conflito</th>
+                <th>Observacoes</th>
+                <th>Mediacao</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in _reservas)
+            {
+                <tr class="@(r.TemConflitoPendente || r.Status == StatusReserva.Conflito ? "conflict-row" : "")">
+                    <td class="fw-semibold">@r.EspacoNome</td>
+                    <td>@r.AssociadoNome</td>
+                    <td>@r.FinalidadeUso</td>
+                    <td>
+                        <div>@r.DataHoraInicio.ToString("dd/MM/yyyy HH:mm")</div>
+                        <div class="small text-muted">ate @r.DataHoraFim.ToString("dd/MM/yyyy HH:mm")</div>
+                    </td>
+                    <td>
+                        <span class="badge @GetBadgeClass(r.Status)">@r.Status</span>
+                        @if (r.TemConflitoPendente)
+                        {
+                            <div class="small text-danger fw-bold mt-1">Conflito pendente detectado!</div>
+                        }
+                        @if (r.CriadoOffline)
+                        {
+                            <span class="badge bg-info text-dark mt-1">App Offline Sync</span>
+                        }
+                    </td>
+                    <td><small>@r.Observacoes</small></td>
+                    <td>
+                        @if (r.Status is StatusReserva.PendenteAprovacao or StatusReserva.Conflito)
+                        {
+                            <div class="d-flex gap-1">
+                                <button class="btn btn-sm btn-success" @onclick="() => AprovarReservaAsync(r.Id)">Aprovar</button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => RejeitarReservaAsync(r.Id)">Rejeitar</button>
+                            </div>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private List<EspacoDto> _espacos = [];
+    private List<AssociadoDto> _associados = [];
+    private List<ReservaEspacoDto> _reservas = [];
+
+    private Guid _espacoId;
+    private Guid _associadoId;
+    private FinalidadeUsoEspaco _finalidade = FinalidadeUsoEspaco.Feijoada;
+    private DateTime _inicio = new(2027, 12, 10, 8, 0, 0);
+    private DateTime _fim = new(2027, 12, 11, 18, 0, 0);
+    private string _observacoes = string.Empty;
+
+    private string _novoEspacoNome = string.Empty;
+    private int _novoEspacoCap = 60;
+    private string? _feedback;
+    private bool _erro;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Session.OnSessionChanged += HandleSessionChanged;
+        await LoadAsync();
+    }
+
+    private async void HandleSessionChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadAsync()
+    {
+        Session.AplicarNoEscopo();
+        _espacos = await ReservaService.ListarEspacosAsync();
+        _associados = await AssociadoService.ListarAsync();
+        _reservas = await ReservaService.ListarReservasAsync();
+
+        if (_espacos.Count > 0 && _espacos.All(e => e.Id != _espacoId))
+        {
+            _espacoId = _espacos[0].Id;
+        }
+        if (_associados.Count > 0 && _associados.All(a => a.Id != _associadoId))
+        {
+            _associadoId = _associados[0].Id;
+        }
+    }
+
+    private async Task CriarEspacoAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_novoEspacoNome)) return;
+        Session.AplicarNoEscopo();
+        var clubeId = Session.ClubeId ?? _espacos.FirstOrDefault()?.ClubeId ?? Guid.Empty;
+        await ReservaService.CriarEspacoAsync(new CriarEspacoRequest(clubeId, _novoEspacoNome, _novoEspacoCap, "Novo espaco social", 200m));
+        _novoEspacoNome = string.Empty;
+        _erro = false;
+        _feedback = "Espaco cadastrado com sucesso.";
+        await LoadAsync();
+    }
+
+    private async Task SolicitarReservaAsync()
+    {
+        try
+        {
+            _erro = false;
+            Session.AplicarNoEscopo();
+            var espaco = _espacos.First(e => e.Id == _espacoId);
+            var res = await ReservaService.SolicitarReservaAsync(new CriarReservaRequest(
+                null, _espacoId, espaco.ClubeId, _associadoId, _finalidade, _inicio, _fim, _observacoes));
+
+            _feedback = res.Status == StatusReserva.Conflito
+                ? "Atencao: Reserva registrada com status CONFLITO pois sobrepoe uma reserva confirmada!"
+                : res.TemConflitoPendente
+                    ? "Reserva criada como pendente, mas ha conflito com outra solicitacao aguardando decisao."
+                    : "Reserva registrada com sucesso.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _erro = true;
+            _feedback = ex.Message;
+        }
+    }
+
+    private async Task AprovarReservaAsync(Guid id)
+    {
+        try
+        {
+            _erro = false;
+            Session.AplicarNoEscopo();
+            await ReservaService.AprovarReservaAsync(id);
+            _feedback = "Reserva aprovada! Eventuais solicitacoes concorrentes foram rejeitadas por conflito.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _erro = true;
+            _feedback = ex.Message;
+        }
+    }
+
+    private async Task RejeitarReservaAsync(Guid id)
+    {
+        Session.AplicarNoEscopo();
+        await ReservaService.RejeitarReservaAsync(id, "Rejeitada pela presidencia");
+        _erro = false;
+        _feedback = "Reserva rejeitada.";
+        await LoadAsync();
+    }
+
+    private static string GetBadgeClass(StatusReserva s) => s switch
+    {
+        StatusReserva.Confirmada => "bg-success",
+        StatusReserva.PendenteAprovacao => "bg-warning text-dark",
+        StatusReserva.Conflito or StatusReserva.RejeitadaPorConflito => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    public void Dispose() => Session.OnSessionChanged -= HandleSessionChanged;
+}

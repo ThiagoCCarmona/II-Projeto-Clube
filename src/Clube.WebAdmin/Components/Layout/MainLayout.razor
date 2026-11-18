@@ -1,0 +1,124 @@
+﻿@inherits LayoutComponentBase
+@inject AdminSessionState Session
+@inject IAuthService AuthService
+@implements IDisposable
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4 d-flex flex-wrap align-items-center justify-content-between gap-2 py-2" style="height:auto; min-height: 3.5rem;">
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary">@Session.Perfil</span>
+                <span class="fw-semibold text-dark">@Session.NomeUsuario</span>
+                <span class="text-muted small">| Tenant: <strong>@Session.ClubeNome</strong></span>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="small text-muted fw-semibold">Demo Rapida:</span>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Seletor rapido de perfil">
+                    <button type="button"
+                            class="btn @(Session.ChavePerfilAtual == "superadmin" ? "btn-dark" : "btn-outline-dark")"
+                            @onclick='() => Session.SelecionarPerfilDemo("superadmin")'>
+                        SuperAdmin
+                    </button>
+                    <button type="button"
+                            class="btn @(Session.ChavePerfilAtual == "presidente-foz" ? "btn-primary" : "btn-outline-primary")"
+                            @onclick='() => Session.SelecionarPerfilDemo("presidente-foz")'>
+                        Pres. Foz
+                    </button>
+                    <button type="button"
+                            class="btn @(Session.ChavePerfilAtual == "tesoureiro-foz" ? "btn-success" : "btn-outline-success")"
+                            @onclick='() => Session.SelecionarPerfilDemo("tesoureiro-foz")'>
+                        Tesoureiro Foz
+                    </button>
+                    <button type="button"
+                            class="btn @(Session.ChavePerfilAtual == "presidente-guaira" ? "btn-info" : "btn-outline-info")"
+                            @onclick='() => Session.SelecionarPerfilDemo("presidente-guaira")'>
+                        Pres. Guaira
+                    </button>
+                </div>
+
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => _mostrarLogin = !_mostrarLogin">
+                    Login CPF
+                </button>
+            </div>
+        </div>
+
+        @if (_mostrarLogin)
+        {
+            <div class="bg-light border-bottom px-4 py-2">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">CPF</label>
+                        <input class="form-control form-control-sm" @bind="_loginCpf" placeholder="000.000.000-00" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1">Senha</label>
+                        <input type="password" class="form-control form-control-sm" @bind="_loginSenha" />
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-sm btn-primary" @onclick="EntrarAsync">Autenticar</button>
+                        <button type="button" class="btn btn-sm btn-link" @onclick="() => _mostrarLogin = false">Fechar</button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_erroLogin))
+                    {
+                        <div class="col-md-3 text-danger small">@_erroLogin</div>
+                    }
+                </div>
+            </div>
+        }
+
+        <article class="content px-4 pb-5">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Ocorreu um erro inesperado.
+    <a href="." class="reload">Recarregar</a>
+    <span class="dismiss">x</span>
+</div>
+
+@code {
+    private bool _mostrarLogin;
+    private string _loginCpf = "111.111.111-11";
+    private string _loginSenha = "User@123";
+    private string? _erroLogin;
+
+    protected override void OnInitialized()
+    {
+        Session.AplicarNoEscopo();
+        Session.OnSessionChanged += OnSessionUpdated;
+    }
+
+    private void OnSessionUpdated() => InvokeAsync(StateHasChanged);
+
+    private async Task EntrarAsync()
+    {
+        _erroLogin = null;
+        var resp = await AuthService.LoginAsync(new LoginRequest(_loginCpf, _loginSenha));
+        if (resp is null)
+        {
+            _erroLogin = "CPF ou senha invalidos.";
+            return;
+        }
+
+        if (resp.Perfil is not (PerfilUsuario.SuperAdmin or PerfilUsuario.Presidente or PerfilUsuario.Tesoureiro))
+        {
+            _erroLogin = $"Perfil {resp.Perfil} usa o App Movel (MAUI).";
+            return;
+        }
+
+        Session.AplicarLogin(resp);
+        _mostrarLogin = false;
+    }
+
+    public void Dispose()
+    {
+        Session.OnSessionChanged -= OnSessionUpdated;
+    }
+}

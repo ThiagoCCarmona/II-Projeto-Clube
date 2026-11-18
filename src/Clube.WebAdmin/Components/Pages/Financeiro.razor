@@ -1,0 +1,192 @@
+@page "/financeiro"
+@inject AdminSessionState Session
+@inject IMensalidadeService MensalidadeService
+@inject IClubeService ClubeService
+@implements IDisposable
+
+<PageTitle>Financeiro &amp; PIX — Tesoureiro</PageTitle>
+
+<h3>Controle Financeiro &amp; Mensalidades PIX (EMV CRC16)</h3>
+<p class="text-muted small">
+    A geracao em lote cobra automaticamente apenas <strong>Socios Titulares aprovados</strong> (Fundadores e Convidados).
+    Simpatizantes, dependentes e cadastros pendentes sao isentos.
+</p>
+
+@if (!string.IsNullOrEmpty(_feedback))
+{
+    <div class="alert @(_erro ? "alert-danger" : "alert-success") alert-dismissible fade show">
+        @_feedback
+        <button type="button" class="btn-close" @onclick="() => _feedback = null"></button>
+    </div>
+}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white fw-semibold">Gerar Cobrancas em Lote (Tesoureiro)</div>
+    <div class="card-body">
+        <div class="row g-2 align-items-end">
+            @if (Session.EhSuperAdmin)
+            {
+                <div class="col-md-3">
+                    <label class="form-label small">Clube</label>
+                    <select class="form-select form-select-sm" @bind="_clubeSelecionadoId">
+                        @foreach (var c in _clubes)
+                        {
+                            <option value="@c.Id">@c.Nome</option>
+                        }
+                    </select>
+                </div>
+            }
+            <div class="col-md-2">
+                <label class="form-label small">Competencia (MM/AAAA)</label>
+                <input class="form-control form-control-sm" @bind="_competencia" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Data Vencimento</label>
+                <input type="date" class="form-control form-control-sm" @bind="_vencimento" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small">Valor (opcional)</label>
+                <input type="number" step="0.01" class="form-control form-control-sm" @bind="_valorCustom" placeholder="Padrao clube" />
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-sm btn-success w-100" @onclick="GerarLoteAsync">Gerar Lote PIX</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_pixSelecionado is not null)
+{
+    <div class="card border-success shadow-sm mb-4">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <span>Codigo PIX Copia-e-Cola (EMV QRCPS-MPM / CRC16-CCITT)</span>
+            <button type="button" class="btn-close btn-close-white" @onclick="() => _pixSelecionado = null"></button>
+        </div>
+        <div class="card-body">
+            <div class="small mb-2">
+                <strong>Associado:</strong> @_pixSelecionado.AssociadoNome |
+                <strong>Competencia:</strong> @_pixSelecionado.Competencia |
+                <strong>Valor:</strong> R$ @_pixSelecionado.Valor.ToString("N2")
+            </div>
+            <div class="pix-code-box">@_pixSelecionado.CodigoPixCopiaECola</div>
+        </div>
+    </div>
+}
+
+<div class="table-responsive">
+    <table class="table table-hover table-bordered align-middle bg-white">
+        <thead class="table-light">
+            <tr>
+                <th>Associado / CPF</th>
+                <th>Tipo</th>
+                <th>Competencia</th>
+                <th>Vencimento</th>
+                <th>Valor</th>
+                <th>Status</th>
+                <th>Acoes do Tesoureiro</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var m in _mensalidades)
+            {
+                <tr>
+                    <td>
+                        <div class="fw-semibold">@m.AssociadoNome</div>
+                        <small class="text-muted">@m.AssociadoCpf</small>
+                    </td>
+                    <td><small>@m.TipoAssociado</small></td>
+                    <td><span class="badge bg-light text-dark border">@m.Competencia</span></td>
+                    <td>@m.DataVencimento.ToString("dd/MM/yyyy")</td>
+                    <td class="fw-semibold">R$ @m.Valor.ToString("N2")</td>
+                    <td>
+                        @if (m.Status == StatusMensalidade.Paga)
+                        {
+                            <span class="badge bg-success">Paga (@m.DataPagamento?.ToString("dd/MM"))</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark">@m.Status</span>
+                        }
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => _pixSelecionado = m">Ver PIX</button>
+                            @if (m.Status != StatusMensalidade.Paga)
+                            {
+                                <button class="btn btn-sm btn-success" @onclick="() => BaixarAsync(m.Id)">Baixa Manual</button>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private List<MensalidadeDto> _mensalidades = [];
+    private List<ClubeDto> _clubes = [];
+    private Guid _clubeSelecionadoId;
+    private string _competencia = DateTime.UtcNow.AddMonths(1).ToString("MM/yyyy");
+    private DateTime _vencimento = DateTime.Today.AddDays(15);
+    private decimal? _valorCustom;
+    private MensalidadeDto? _pixSelecionado;
+    private string? _feedback;
+    private bool _erro;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Session.OnSessionChanged += HandleSessionChanged;
+        await LoadAsync();
+    }
+
+    private async void HandleSessionChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadAsync()
+    {
+        Session.AplicarNoEscopo();
+        _clubes = await ClubeService.ListarAsync();
+        if (_clubeSelecionadoId == Guid.Empty && _clubes.Count > 0)
+        {
+            _clubeSelecionadoId = Session.ClubeId ?? _clubes[0].Id;
+        }
+        _mensalidades = await MensalidadeService.ListarAsync();
+    }
+
+    private async Task GerarLoteAsync()
+    {
+        try
+        {
+            _erro = false;
+            Session.AplicarNoEscopo();
+            var clubeId = Session.ClubeId ?? _clubeSelecionadoId;
+            var res = await MensalidadeService.GerarLoteAsync(
+                new GerarLoteMensalidadeRequest(clubeId, _competencia, _vencimento, _valorCustom));
+            _feedback = $"Lote {_competencia}: {res.Geradas} geradas, {res.JaExistentes} ja existentes, {res.IsentosOuNaoTitulares} isentos/pendentes.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _erro = true;
+            _feedback = ex.Message;
+        }
+    }
+
+    private async Task BaixarAsync(Guid id)
+    {
+        Session.AplicarNoEscopo();
+        await MensalidadeService.BaixarAsync(id, $"Baixa manual por {Session.NomeUsuario}");
+        _erro = false;
+        _feedback = "Mensalidade baixada como Paga.";
+        await LoadAsync();
+    }
+
+    public void Dispose() => Session.OnSessionChanged -= HandleSessionChanged;
+}

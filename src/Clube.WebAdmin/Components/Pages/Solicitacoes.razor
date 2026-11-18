@@ -1,0 +1,101 @@
+@page "/solicitacoes"
+@inject AdminSessionState Session
+@inject ISolicitacaoService SolicitacaoService
+@implements IDisposable
+
+<PageTitle>SAC / Ouvidoria — Projeto Clubes</PageTitle>
+
+<h3>Solicitacoes &amp; Reclamacoes dos Associados</h3>
+
+@if (!string.IsNullOrEmpty(_feedback))
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        @_feedback
+        <button type="button" class="btn-close" @onclick="() => _feedback = null"></button>
+    </div>
+}
+
+<div class="row g-3">
+    @foreach (var s in _solicitacoes)
+    {
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <span>
+                        <span class="badge @(s.Tipo == TipoSolicitacao.Reclamacao ? "bg-danger" : "bg-primary") me-1">@s.Tipo</span>
+                        <strong>@s.Assunto</strong>
+                    </span>
+                    <span class="badge @(s.Status == StatusSolicitacao.Respondida ? "bg-success" : "bg-warning text-dark")">
+                        @s.Status
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="small text-muted mb-2">
+                        Por: <strong>@s.AssociadoNome</strong> em @s.DataCriacao.ToString("dd/MM/yyyy HH:mm")
+                    </div>
+                    <p class="mb-3">@s.Descricao</p>
+
+                    @if (!string.IsNullOrWhiteSpace(s.RespostaDiretoria))
+                    {
+                        <div class="alert alert-light border small mb-0">
+                            <strong>Resposta da Diretoria:</strong> @s.RespostaDiretoria
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="input-group input-group-sm">
+                            <input class="form-control"
+                                   value="@GetRascunho(s.Id)"
+                                   @onchange="e => SetRascunho(s.Id, e.Value?.ToString() ?? string.Empty)"
+                                   placeholder="Digite a resposta da diretoria..." />
+                            <button class="btn btn-primary" @onclick="() => ResponderAsync(s.Id)">Responder</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<SolicitacaoDto> _solicitacoes = [];
+    private readonly Dictionary<Guid, string> _rascunhos = [];
+    private string? _feedback;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Session.OnSessionChanged += HandleSessionChanged;
+        await LoadAsync();
+    }
+
+    private async void HandleSessionChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadAsync()
+    {
+        Session.AplicarNoEscopo();
+        _solicitacoes = await SolicitacaoService.ListarAsync();
+    }
+
+    private string GetRascunho(Guid id) => _rascunhos.TryGetValue(id, out var v) ? v : string.Empty;
+    private void SetRascunho(Guid id, string valor) => _rascunhos[id] = valor;
+
+    private async Task ResponderAsync(Guid id)
+    {
+        var texto = GetRascunho(id);
+        if (string.IsNullOrWhiteSpace(texto)) return;
+
+        Session.AplicarNoEscopo();
+        await SolicitacaoService.ResponderAsync(id, new ResponderSolicitacaoRequest(texto));
+        _feedback = "Resposta registrada com sucesso.";
+        await LoadAsync();
+    }
+
+    public void Dispose() => Session.OnSessionChanged -= HandleSessionChanged;
+}

@@ -1,0 +1,377 @@
+@page "/associados"
+@inject AdminSessionState Session
+@inject IAssociadoService AssociadoService
+@inject IClubeService ClubeService
+@implements IDisposable
+
+<PageTitle>Associados &amp; Direito a Voto</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="mb-0">Associados &amp; Governanca Estatutaria</h3>
+        <small class="text-muted">Tenant ativo: <strong>@Session.ClubeNome</strong></small>
+    </div>
+    <button class="btn btn-sm btn-primary" @onclick="() => _mostrarNovo = !_mostrarNovo">
+        @(_mostrarNovo ? "Fechar Formulario" : "+ Novo Associado")
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(_feedback))
+{
+    <div class="alert @(_erro ? "alert-danger" : "alert-success") alert-dismissible fade show">
+        @_feedback
+        <button type="button" class="btn-close" @onclick="() => _feedback = null"></button>
+    </div>
+}
+
+@if (_mostrarNovo)
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold">Cadastrar Associado (com validacao de CPF)</div>
+        <div class="card-body">
+            <div class="row g-2">
+                @if (Session.EhSuperAdmin)
+                {
+                    <div class="col-md-4">
+                        <label class="form-label small">Clube</label>
+                        <select class="form-select form-select-sm" @bind="_novoClubeId">
+                            @foreach (var c in _clubes)
+                            {
+                                <option value="@c.Id">@c.Nome</option>
+                            }
+                        </select>
+                    </div>
+                }
+                <div class="col-md-4">
+                    <label class="form-label small">Nome Completo</label>
+                    <input class="form-control form-control-sm" @bind="_nome" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">CPF</label>
+                    <div class="input-group input-group-sm">
+                        <input class="form-control" @bind="_cpf" placeholder="000.000.000-00" />
+                        <button class="btn btn-outline-secondary" type="button" @onclick="GerarCpfDemo">Gerar Valido</button>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Tipo de Associado</label>
+                    <select class="form-select form-select-sm" @bind="_tipo">
+                        <option value="@TipoAssociado.SocioFundadorComVoto">Socio Fundador (Com Voto)</option>
+                        <option value="@TipoAssociado.SocioConvidadoSemVoto">Socio Convidado (Sem Voto)</option>
+                        <option value="@TipoAssociado.Simpatizante">Simpatizante (Sem Voto)</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">E-mail</label>
+                    <input class="form-control form-control-sm" @bind="_email" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Telefone</label>
+                    <input class="form-control form-control-sm" @bind="_telefone" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Sexo</label>
+                    <select class="form-select form-select-sm" @bind="_sexo">
+                        <option>Masculino</option>
+                        <option>Feminino</option>
+                        <option>Outro</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Estado Civil</label>
+                    <select class="form-select form-select-sm" @bind="_estadoCivil">
+                        <option>Solteiro(a)</option>
+                        <option>Casado(a)</option>
+                        <option>Divorciado(a)</option>
+                        <option>Viuvo(a)</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Data Nascimento</label>
+                    <input type="date" class="form-control form-control-sm" @bind="_nascimento" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Endereco</label>
+                    <input class="form-control form-control-sm" @bind="_endereco" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Bairro</label>
+                    <input class="form-control form-control-sm" @bind="_bairro" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Cidade</label>
+                    <input class="form-control form-control-sm" @bind="_cidade" />
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label small">UF</label>
+                    <input class="form-control form-control-sm" @bind="_uf" maxlength="2" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small">Interesses (Pesca, Caca, Comida, Bebida...)</label>
+                    <input class="form-control form-control-sm" @bind="_interesses" />
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" @bind="_aprovarDireto" id="chkAprovar" />
+                        <label class="form-check-label small" for="chkAprovar">Aprovar imediatamente</label>
+                    </div>
+                </div>
+                <div class="col-md-3 d-flex align-items-end justify-content-end">
+                    <button class="btn btn-sm btn-success" @onclick="CriarAssociadoAsync">Salvar Associado</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="table-responsive">
+    <table class="table table-hover table-bordered align-middle bg-white">
+        <thead class="table-light">
+            <tr>
+                <th>Associado / CPF</th>
+                <th>Clube</th>
+                <th>Tipo</th>
+                <th>Status</th>
+                <th>Direito a Voto</th>
+                <th>Interesses &amp; Dependentes</th>
+                <th>Acoes do Presidente</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var a in _associados)
+            {
+                <tr>
+                    <td>
+                        <div class="fw-semibold">@a.Nome</div>
+                        <small class="text-muted">@a.CPF | @a.Email</small>
+                    </td>
+                    <td><small>@a.ClubeNome</small></td>
+                    <td>
+                        <span class="badge bg-light text-dark border">@a.TipoAssociado</span>
+                    </td>
+                    <td>
+                        @if (a.StatusAprovacao == StatusAprovacao.Aprovado)
+                        {
+                            <span class="badge bg-success">Aprovado</span>
+                        }
+                        else if (a.StatusAprovacao == StatusAprovacao.Pendente)
+                        {
+                            <span class="badge bg-warning text-dark">Pendente</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-danger">Rejeitado</span>
+                            <div class="small text-danger">@a.MotivoRejeicao</div>
+                        }
+                    </td>
+                    <td>
+                        @if (a.TemDireitoAVoto)
+                        {
+                            <span class="badge bg-primary">SIM (Tem Voto)</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">NAO</span>
+                        }
+                    </td>
+                    <td>
+                        <div class="small">@a.Interesses</div>
+                        <div class="small text-muted">Dependentes: <strong>@a.Dependentes.Count</strong></div>
+                        @if (a.Dependentes.Count > 0)
+                        {
+                            <ul class="list-unstyled mb-0 small text-secondary">
+                                @foreach (var d in a.Dependentes)
+                                {
+                                    <li>• @d.Nome (@d.GrauParentesco)</li>
+                                }
+                            </ul>
+                        }
+                    </td>
+                    <td>
+                        <div class="d-flex flex-wrap gap-1">
+                            @if (a.StatusAprovacao != StatusAprovacao.Aprovado)
+                            {
+                                <button class="btn btn-sm btn-success" @onclick="() => AprovarAsync(a.Id)">Aprovar</button>
+                            }
+                            @if (a.StatusAprovacao == StatusAprovacao.Pendente)
+                            {
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => RejeitarAsync(a.Id)">Rejeitar</button>
+                            }
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => AbrirDependente(a)">+ Dependente</button>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (_titularParaDependente is not null)
+{
+    <div class="card shadow-sm mt-3 border-primary">
+        <div class="card-header bg-primary text-white fw-semibold d-flex justify-content-between">
+            <span>Adicionar Dependente para @_titularParaDependente.Nome</span>
+            <button type="button" class="btn-close btn-close-white" @onclick="() => _titularParaDependente = null"></button>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label small">Nome</label>
+                    <input class="form-control form-control-sm" @bind="_depNome" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">CPF</label>
+                    <div class="input-group input-group-sm">
+                        <input class="form-control" @bind="_depCpf" />
+                        <button class="btn btn-outline-secondary" type="button" @onclick="GerarCpfDependente">Gerar</button>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Parentesco</label>
+                    <select class="form-select form-select-sm" @bind="_depParentesco">
+                        <option value="@GrauParentesco.Conjuge">Conjuge</option>
+                        <option value="@GrauParentesco.Filho">Filho(a)</option>
+                        <option value="@GrauParentesco.Outro">Outro</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">E-mail</label>
+                    <input class="form-control form-control-sm" @bind="_depEmail" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-sm btn-primary w-100" @onclick="SalvarDependenteAsync">Salvar Dep.</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<AssociadoDto> _associados = [];
+    private List<ClubeDto> _clubes = [];
+    private bool _mostrarNovo;
+    private string? _feedback;
+    private bool _erro;
+
+    private Guid _novoClubeId;
+    private string _nome = string.Empty;
+    private string _cpf = string.Empty;
+    private string _email = string.Empty;
+    private string _telefone = "(45) 99900-1122";
+    private TipoAssociado _tipo = TipoAssociado.SocioFundadorComVoto;
+    private DateTime _nascimento = new(1990, 1, 15);
+    private string _sexo = "Masculino";
+    private string _estadoCivil = "Casado(a)";
+    private string _endereco = "Av. Brasil, 500";
+    private string _bairro = "Centro";
+    private string _cidade = "Foz do Iguacu";
+    private string _uf = "PR";
+    private string _interesses = "Pesca, Comida, Bebida";
+    private bool _aprovarDireto = true;
+
+    private AssociadoDto? _titularParaDependente;
+    private string _depNome = string.Empty;
+    private string _depCpf = string.Empty;
+    private GrauParentesco _depParentesco = GrauParentesco.Filho;
+    private string _depEmail = "dep@clube.local";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Session.OnSessionChanged += HandleSessionChanged;
+        await LoadAsync();
+    }
+
+    private async void HandleSessionChanged()
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadAsync()
+    {
+        Session.AplicarNoEscopo();
+        _clubes = await ClubeService.ListarAsync();
+        if (_novoClubeId == Guid.Empty && _clubes.Count > 0)
+        {
+            _novoClubeId = Session.ClubeId ?? _clubes[0].Id;
+        }
+        _associados = await AssociadoService.ListarAsync();
+    }
+
+    private void GerarCpfDemo() => _cpf = CpfValidator.GerarCpfValido(Random.Shared.Next(1000, 999999));
+    private void GerarCpfDependente() => _depCpf = CpfValidator.GerarCpfValido(Random.Shared.Next(1000, 999999));
+
+    private async Task CriarAssociadoAsync()
+    {
+        try
+        {
+            _erro = false;
+            Session.AplicarNoEscopo();
+            var clubeId = Session.ClubeId ?? _novoClubeId;
+            await AssociadoService.CriarAsync(new CriarAssociadoRequest(
+                clubeId, _nome, _cpf, _email, _telefone, "User@123",
+                _tipo, _nascimento, _sexo, _estadoCivil, _endereco, _bairro, _cidade, _uf,
+                _interesses, _aprovarDireto));
+            _feedback = "Associado cadastrado com sucesso.";
+            _mostrarNovo = false;
+            _nome = _cpf = _email = string.Empty;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _erro = true;
+            _feedback = ex.Message;
+        }
+    }
+
+    private async Task AprovarAsync(Guid id)
+    {
+        Session.AplicarNoEscopo();
+        await AssociadoService.AprovarAsync(id);
+        _erro = false;
+        _feedback = "Associado aprovado com sucesso.";
+        await LoadAsync();
+    }
+
+    private async Task RejeitarAsync(Guid id)
+    {
+        Session.AplicarNoEscopo();
+        await AssociadoService.RejeitarAsync(id, "Documentacao pendente na secretaria.");
+        _erro = false;
+        _feedback = "Associado marcado como rejeitado.";
+        await LoadAsync();
+    }
+
+    private void AbrirDependente(AssociadoDto a)
+    {
+        _titularParaDependente = a;
+        _depNome = string.Empty;
+        _depCpf = CpfValidator.GerarCpfValido(Random.Shared.Next(1000, 999999));
+    }
+
+    private async Task SalvarDependenteAsync()
+    {
+        if (_titularParaDependente is null) return;
+        try
+        {
+            _erro = false;
+            Session.AplicarNoEscopo();
+            await AssociadoService.AdicionarDependenteAsync(
+                _titularParaDependente.Id,
+                new CriarDependenteRequest(_depNome, _depCpf, _depParentesco, new DateTime(2010, 5, 10), _depEmail, "(45) 99999-0000"));
+            _feedback = $"Dependente '{_depNome}' vinculado ao titular.";
+            _titularParaDependente = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _erro = true;
+            _feedback = ex.Message;
+        }
+    }
+
+    public void Dispose() => Session.OnSessionChanged -= HandleSessionChanged;
+}

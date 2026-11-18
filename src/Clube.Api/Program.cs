@@ -8,10 +8,9 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? DependencyInjection.ResolveLocalDatabasePath(builder.Environment.ContentRootPath);
-
-builder.Services.AddClubeInfrastructure(connectionString);
+builder.Services.AddClubeInfrastructure(
+    builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? DependencyInjection.ResolveLocalDatabasePath(builder.Environment.ContentRootPath));
 
 var jwtKey = builder.Configuration["Jwt:SecretKey"] ?? JwtTokenService.DefaultDevKey;
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "Clube.Api";
