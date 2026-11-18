@@ -1,0 +1,23 @@
+## .NET
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.cache
+*.log
+TestResults/
+*.trx
+*.coverage
+
+## SQLite Local Databases
+*.db
+*.db-shm
+*.db-wal
+app_clubes.db*
+
+## MAUI / Mobile
+**/AppPackages/
+**/BundleArtifacts/
+.DS_Store
+Thumbs.db
